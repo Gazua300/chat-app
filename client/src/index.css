@@ -1,0 +1,1494 @@
+Skip to content
+DEV Community
+Search...
+
+Log in
+Create account
+
+116
+Like
+42
+Unicorn
+205
+Save
+
+Cover image for Building a chat app with Socket.io and React 🚀
+novu profile imageNevo David
+Nevo David for novu
+Posted on 15 de ago. • Originally published at novu.co
+
+Building a chat app with Socket.io and React 🚀
+#
+react
+#
+node
+#
+javascript
+#
+programming
+What is this article about?
+We have all encountered chat over the web, that can be Facebook, Instagram, Whatsapp and the list goes on.
+Just to give a bit of context, you send a message to a person or a group, they see the message and reply back. Simple yet complex.
+
+To develop a chat app you would need to be aware of new messages as soon as they arrive.
+Usually, to get information from the server you need send an HTTP request. With websockets, the server lets you know when there is new information without asking it.
+
+In this article, we'll leverage the real-time communication provided by Socket.io to create an open chat application that allows users to send and receive messages from several users on the application. You will also learn how to detect the users who are online and when a user is typing.
+
+💡 To read this article you'll need to have a basic knowledge of React.js and Node.js to comprehend this article.
+
+GIFChat
+
+What is Socket.io?
+Socket.io is a popular JavaScript library that allows us to create real-time, bi-directional communication between web browsers and a Node.js server. It is a highly performant and reliable library optimized to process a large volume of data with minimal delay. It follows the WebSocket protocol and provides better functionalities, such as fallback to HTTP long-polling or automatic reconnection, which enables us to build efficient chat and real-time applications.
+
+Novu - the first open-source notification infrastructure
+Just a quick background about us. Novu is the first open-source notification infrastructure. We basically help to manage all the product notifications. It can be In-App (the bell icon like you have in Facebook - Websockets), Emails, SMSs and so on.
+I would be super happy if you could give us a star! And let me also know in the comments ❤️
+https://github.com/novuhq/novu
+
+GIFNovu
+
+How to connect a React.js app to Node.js via Socket.io
+In this section, we'll set up the project environment for our chat application. You'll also learn how to add Socket.io to a React and Node.js application and connect both development servers for real-time communication via Socket.io.
+
+Create the project folder containing two sub-folders named client and server.
+mkdir chat-app
+cd chat-app
+mkdir client server
+Navigate into the client folder via your terminal and create a new React.js project.
+cd client
+npx create-react-app ./
+Install Socket.io client API and React Router. React Router is a JavaScript library that enables us to navigate between pages in a React application.
+npm install socket.io-client react-router-dom
+Delete the redundant files such as the logo and the test files from the React app, and update the App.js file to display Hello World as below.
+function App() {
+  return (
+    <div>
+      <p>Hello World!</p>
+    </div>
+  );
+}
+Next, navigate into the server folder and create a package.json file.
+cd server
+npm init -y
+Install Express.js, CORS, Nodemon, and Socket.io Server API.
+
+Express.js is a fast, minimalist framework that provides several features for building web applications in Node.js. CORS is a Node.js package that allows communication between different domains.
+
+Nodemon is a Node.js tool that automatically restarts the server after detecting file changes, and Socket.io allows us to configure a real-time connection on the server.
+npm install express cors nodemon socket.io 
+Create an index.js file - the entry point to the web server.
+touch index.js
+Set up a simple Node.js server using Express.js. The code snippet below returns a JSON object when you visit the http://localhost:4000/api in your browser.
+//index.js
+const express = require('express');
+const app = express();
+const PORT = 4000;
+
+app.get('/api', (req, res) => {
+  res.json({
+    message: 'Hello world',
+  });
+});
+
+app.listen(PORT, () => {
+  console.log(`Server listening on ${PORT}`);
+});
+Import the HTTP and the CORS library to allow data transfer between the client and the server domains.
+const express = require('express');
+const app = express();
+const PORT = 4000;
+
+//New imports
+const http = require('http').Server(app);
+const cors = require('cors');
+
+app.use(cors());
+
+app.get('/api', (req, res) => {
+  res.json({
+    message: 'Hello world',
+  });
+});
+
+http.listen(PORT, () => {
+  console.log(`Server listening on ${PORT}`);
+});
+Next, add Socket.io to the project to create a real-time connection. Before the app.get() block, copy the code below.
+//New imports
+.....
+const socketIO = require('socket.io')(http, {
+    cors: {
+        origin: "http://localhost:3000"
+    }
+});
+
+//Add this before the app.get() block
+socketIO.on('connection', (socket) => {
+    console.log(`⚡: ${socket.id} user just connected!`);
+    socket.on('disconnect', () => {
+      console.log('🔥: A user disconnected');
+    });
+});
+From the code snippet above, the socket.io("connection") function establishes a connection with the React app, then creates a unique ID for each socket and logs the ID to the console whenever a user visits the web page.
+
+When you refresh or close the web page, the socket fires the disconnect event showing that a user has disconnected from the socket.
+
+Next, configure Nodemon by adding the start command to the list of the scripts in the package.json file. The code snippet below starts the server using Nodemon.
+//In server/package.json
+
+"scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon index.js"
+  },
+You can now run the server with Nodemon by using the command below.
+npm start
+Open the App.js file in the client folder and connect the React app to the Socket.io server.
+import socketIO from 'socket.io-client';
+const socket = socketIO.connect('http://localhost:4000');
+
+function App() {
+  return (
+    <div>
+      <p>Hello World!</p>
+    </div>
+  );
+}
+Start the React.js server.
+npm start
+Check the terminal where the server is running; the ID of the React.js client appears in the terminal.
+
+Congratulations 🥂 , the React app has been successfully connected to the server via Socket.io.
+
+💡 For the remaining part of this article, I will walk you through creating the web pages for the chat application and sending messages back and forth between the React app and the Node.js server. I'll also guide you on how to add the auto-scroll feature when a new message arrives and how to fetch active users in your chat application.
+
+Creating the Home page for the chat application
+In this section, we'll create the home page for the chat application that accepts the username and saves it to the local storage for identification.
+
+Create a folder named components within the client/src folder. Then, create the Home page component.
+cd src
+mkdir components & cd components
+touch Home.js
+Copy the code below into the Home.js file. The code snippet displays a form input that accepts the username and stores it in the local storage.
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+const Home = () => {
+  const navigate = useNavigate();
+  const [userName, setUserName] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    localStorage.setItem('userName', userName);
+    navigate('/chat');
+  };
+  return (
+    <form className="home__container" onSubmit={handleSubmit}>
+      <h2 className="home__header">Sign in to Open Chat</h2>
+      <label htmlFor="username">Username</label>
+      <input
+        type="text"
+        minLength={6}
+        name="username"
+        id="username"
+        className="username__input"
+        value={userName}
+        onChange={(e) => setUserName(e.target.value)}
+      />
+      <button className="home__cta">SIGN IN</button>
+    </form>
+  );
+};
+
+export default Home;
+Next, configure React Router to enable navigation between the pages of the chat application. A home and chat page is enough for this application.
+
+Copy the code below into the src/App.js file.
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Home from './components/Home';
+import ChatPage from './components/ChatPage';
+import socketIO from 'socket.io-client';
+
+const socket = socketIO.connect('http://localhost:4000');
+function App() {
+  return (
+    <BrowserRouter>
+      <div>
+        <Routes>
+          <Route path="/" element={<Home socket={socket} />}></Route>
+          <Route path="/chat" element={<ChatPage socket={socket} />}></Route>
+        </Routes>
+      </div>
+    </BrowserRouter>
+  );
+}
+
+export default App;
+The code snippet assigns different routes for the Home and Chat page of the application using React Router v6 and passes the Socket.io library into the components. We'll create the Chat page in the upcoming section.
+
+Navigate into the src/index.css file and copy the code below. It contains all the CSS required for styling this project.
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap');
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Poppins', sans-serif;
+}
+.home__container {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+.home__container > * {
+  margin-bottom: 10px;
+}
+.home__header {
+  margin-bottom: 30px;
+}
+.username__input {
+  padding: 10px;
+  width: 50%;
+}
+.home__cta {
+  width: 200px;
+  padding: 10px;
+  font-size: 16px;
+  cursor: pointer;
+  background-color: #607eaa;
+  color: #f9f5eb;
+  outline: none;
+  border: none;
+  border-radius: 5px;
+}
+.chat {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+}
+.chat__sidebar {
+  height: 100%;
+  background-color: #f9f5eb;
+  flex: 0.2;
+  padding: 20px;
+  border-right: 1px solid #fdfdfd;
+}
+.chat__main {
+  height: 100%;
+  flex: 0.8;
+}
+.chat__header {
+  margin: 30px 0 20px 0;
+}
+.chat__users > * {
+  margin-bottom: 10px;
+  color: #607eaa;
+  font-size: 14px;
+}
+.online__users > * {
+  margin-bottom: 10px;
+  color: rgb(238, 102, 102);
+  font-style: italic;
+}
+.chat__mainHeader {
+  width: 100%;
+  height: 10vh;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  background-color: #f9f5eb;
+}
+.leaveChat__btn {
+  padding: 10px;
+  width: 150px;
+  border: none;
+  outline: none;
+  background-color: #d1512d;
+  cursor: pointer;
+  color: #eae3d2;
+}
+.message__container {
+  width: 100%;
+  height: 80vh;
+  background-color: #fff;
+  padding: 20px;
+  overflow-y: scroll;
+}
+
+.message__container > * {
+  margin-bottom: 10px;
+}
+.chat__footer {
+  padding: 10px;
+  background-color: #f9f5eb;
+  height: 10vh;
+}
+.form {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.message {
+  width: 80%;
+  height: 100%;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  outline: none;
+  padding: 15px;
+}
+.sendBtn {
+  width: 150px;
+  background-color: green;
+  padding: 10px;
+  border: none;
+  outline: none;
+  color: #eae3d2;
+  cursor: pointer;
+}
+.sendBtn:hover {
+  background-color: rgb(129, 201, 129);
+}
+.message__recipient {
+  background-color: #f5ccc2;
+  width: 300px;
+  padding: 10px;
+  border-radius: 10px;
+  font-size: 15px;
+}
+.message__sender {
+  background-color: rgb(194, 243, 194);
+  max-width: 300px;
+  padding: 10px;
+  border-radius: 10px;
+  margin-left: auto;
+  font-size: 15px;
+}
+.message__chats > p {
+  font-size: 13px;
+}
+.sender__name {
+  text-align: right;
+}
+.message__status {
+  position: fixed;
+  bottom: 50px;
+  font-size: 13px;
+  font-style: italic;
+}
+We've created the home page of our chat application. Next, let's design the user interface for the chat page.
+
+Creating the Chat page of the application
+In this section, we'll create the chat interface that allows us to send messages and view active users.
+
+chat-app interface
+
+From the image above, the Chat page is divided into three sections, the Chat Bar - sidebar showing active users, the Chat Body containing the sent messages and the header, and the Chat Footer - the message box and the send button.
+
+Since we've been able to define the layout for the chat page, you can now create the components for the design.
+
+Create the ChatPage.js file and copy the code below into it. You will need to ChatBar, ChatBody, and ChatFooter components.
+import React from 'react';
+import ChatBar from './ChatBar';
+import ChatBody from './ChatBody';
+import ChatFooter from './ChatFooter';
+
+const ChatPage = ({ socket }) => {
+  return (
+    <div className="chat">
+      <ChatBar />
+      <div className="chat__main">
+        <ChatBody />
+        <ChatFooter />
+      </div>
+    </div>
+  );
+};
+
+export default ChatPage;
+The Chat Bar component
+Copy the code below into the ChatBar.js file.
+import React from 'react';
+
+const ChatBar = () => {
+  return (
+    <div className="chat__sidebar">
+      <h2>Open Chat</h2>
+
+      <div>
+        <h4 className="chat__header">ACTIVE USERS</h4>
+        <div className="chat__users">
+          <p>User 1</p>
+          <p>User 2</p>
+          <p>User 3</p>
+          <p>User 4</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ChatBar;
+The Chat Body component
+Here, we'll create the interface displaying the sent messages and the page headline.
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+
+const ChatBody = () => {
+  const navigate = useNavigate();
+
+  const handleLeaveChat = () => {
+    localStorage.removeItem('userName');
+    navigate('/');
+    window.location.reload();
+  };
+
+  return (
+    <>
+      <header className="chat__mainHeader">
+        <p>Hangout with Colleagues</p>
+        <button className="leaveChat__btn" onClick={handleLeaveChat}>
+          LEAVE CHAT
+        </button>
+      </header>
+
+      {/*This shows messages sent from you*/}
+      <div className="message__container">
+        <div className="message__chats">
+          <p className="sender__name">You</p>
+          <div className="message__sender">
+            <p>Hello there</p>
+          </div>
+        </div>
+
+        {/*This shows messages received by you*/}
+        <div className="message__chats">
+          <p>Other</p>
+          <div className="message__recipient">
+            <p>Hey, I'm good, you?</p>
+          </div>
+        </div>
+
+        {/*This is triggered when a user is typing*/}
+        <div className="message__status">
+          <p>Someone is typing...</p>
+        </div>
+      </div>
+    </>
+  );
+};
+
+export default ChatBody;
+The Chat Footer component
+Here, we'll create the input and the send button at the bottom of the chat page. The message and the username appear in the console after submitting the form.
+import React, { useState } from 'react';
+
+const ChatFooter = () => {
+  const [message, setMessage] = useState('');
+
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+    console.log({ userName: localStorage.getItem('userName'), message });
+    setMessage('');
+  };
+  return (
+    <div className="chat__footer">
+      <form className="form" onSubmit={handleSendMessage}>
+        <input
+          type="text"
+          placeholder="Write message"
+          className="message"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+        />
+        <button className="sendBtn">SEND</button>
+      </form>
+    </div>
+  );
+};
+
+export default ChatFooter;
+Sending messages between the React app and the Socket.io server
+In this section, you'll learn how to send messages from the React app to the Node.js server and vice-versa via Socket.io. To send the messages to the server, we will need to pass the Socket.io library into the ChatFooter - component that sends the messages.
+
+Update the ChatPage.js file to pass the Socket.io library into the ChatFooter component.
+import React from 'react';
+import ChatBar from './ChatBar';
+import ChatBody from './ChatBody';
+import ChatFooter from './ChatFooter';
+
+const ChatPage = ({ socket }) => {
+  return (
+    <div className="chat">
+      <ChatBar />
+      <div className="chat__main">
+        <ChatBody />
+        <ChatFooter socket={socket} />
+      </div>
+    </div>
+  );
+};
+
+export default ChatPage;
+Update the handleSendMessage function in the ChatFooter component to send the message to the Node.js server.
+import React, { useState } from 'react';
+
+const ChatFooter = ({ socket }) => {
+  const [message, setMessage] = useState('');
+
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+    if (message.trim() && localStorage.getItem('userName')) {
+      socket.emit('message', {
+        text: message,
+        name: localStorage.getItem('userName'),
+        id: `${socket.id}${Math.random()}`,
+        socketID: socket.id,
+      });
+    }
+    setMessage('');
+  };
+  return <div className="chat__footer">...</div>;
+};
+
+export default ChatFooter;
+The handleSendMessage function checks if the text field is empty and if the username exists in the local storage (sign-in from the Home page) before sending the message event containing the user input, username, the message ID generated, and the socket or client ID to the Node.js server.
+
+Open the index.js file on the server, update the Socket.io code block to listen to the message event from the React app client, and log the message to the server's terminal.
+socketIO.on('connection', (socket) => {
+  console.log(`⚡: ${socket.id} user just connected!`);
+
+  //Listens and logs the message to the console
+  socket.on('message', (data) => {
+    console.log(data);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('🔥: A user disconnected');
+  });
+});
+We’ve been able to retrieve the message on the server; hence, let's send the message to all the connected clients.
+socketIO.on('connection', (socket) => {
+  console.log(`⚡: ${socket.id} user just connected!`);
+
+  //sends the message to all the users on the server
+  socket.on('message', (data) => {
+    socketIO.emit('messageResponse', data);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('🔥: A user disconnected');
+  });
+});
+Update the ChatPage.js file to listen to the message from the server and display it to all users.
+import React, { useEffect, useState } from 'react';
+import ChatBar from './ChatBar';
+import ChatBody from './ChatBody';
+import ChatFooter from './ChatFooter';
+
+const ChatPage = ({ socket }) => {
+  const [messages, setMessages] = useState([]);
+
+  useEffect(() => {
+    socket.on('messageResponse', (data) => setMessages([...messages, data]));
+  }, [socket, messages]);
+
+  return (
+    <div className="chat">
+      <ChatBar socket={socket} />
+      <div className="chat__main">
+        <ChatBody messages={messages} />
+        <ChatFooter socket={socket} />
+      </div>
+    </div>
+  );
+};
+
+export default ChatPage;
+From the code snippet above, Socket.io listens to the messages sent via the messageResponse event and spreads the data into the messages array. The array of messages is passed into the ChatBody component for display on the UI.
+
+Update the ChatBody.js file to render the data from the array of messages.
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+
+const ChatBody = ({ messages }) => {
+  const navigate = useNavigate();
+
+  const handleLeaveChat = () => {
+    localStorage.removeItem('userName');
+    navigate('/');
+    window.location.reload();
+  };
+
+  return (
+    <>
+      <header className="chat__mainHeader">
+        <p>Hangout with Colleagues</p>
+        <button className="leaveChat__btn" onClick={handleLeaveChat}>
+          LEAVE CHAT
+        </button>
+      </header>
+
+      <div className="message__container">
+        {messages.map((message) =>
+          message.name === localStorage.getItem('userName') ? (
+            <div className="message__chats" key={message.id}>
+              <p className="sender__name">You</p>
+              <div className="message__sender">
+                <p>{message.text}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="message__chats" key={message.id}>
+              <p>{message.name}</p>
+              <div className="message__recipient">
+                <p>{message.text}</p>
+              </div>
+            </div>
+          )
+        )}
+
+        <div className="message__status">
+          <p>Someone is typing...</p>
+        </div>
+      </div>
+    </>
+  );
+};
+
+export default ChatBody;
+The code snippet above displays the messages depending on whether you or another user sent the message. Messages in green are the ones you sent, and red is messages from other users.
+
+Congratulations 🥂, the chat application is now functional. You can open multiple tabs and send messages from one to another.
+
+How to fetch active users from Socket.io
+In this section, you'll learn how to get all the active users and display them on the Chat Bar of the chat application.
+
+chat-app interface
+
+Open the src/Home.js and create an event that listens to users when they sign in. Update the handleSubmit function as below:
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+const Home = ({ socket }) => {
+  const navigate = useNavigate();
+  const [userName, setUserName] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    localStorage.setItem('userName', userName);
+    //sends the username and socket ID to the Node.js server
+    socket.emit('newUser', { userName, socketID: socket.id });
+    navigate('/chat');
+  };
+  return (...)
+  ...
+Create an event listener that updates an array of users on the Node.js server whenever a user joins or leaves the chat application.
+let users = [];
+
+socketIO.on('connection', (socket) => {
+  console.log(`⚡: ${socket.id} user just connected!`);
+  socket.on('message', (data) => {
+    socketIO.emit('messageResponse', data);
+  });
+
+  //Listens when a new user joins the server
+  socket.on('newUser', (data) => {
+    //Adds the new user to the list of users
+    users.push(data);
+    // console.log(users);
+    //Sends the list of users to the client
+    socketIO.emit('newUserResponse', users);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('🔥: A user disconnected');
+    //Updates the list of users when a user disconnects from the server
+    users = users.filter((user) => user.socketID !== socket.id);
+    // console.log(users);
+    //Sends the list of users to the client
+    socketIO.emit('newUserResponse', users);
+    socket.disconnect();
+  });
+});
+socket.on("newUser") is triggered when a new user joins the chat application. The user's details (socket ID and username) are saved into the users array and sent back to the React app in a new event named newUserResponse.
+In socket.io("disconnect"), the users array is updated when a user leaves the chat application, and the newUserReponse event is triggered to send the updated the list of users to the client.
+
+Next, let's update the user interface, ChatBar.js, to display the list of active users.
+import React, { useState, useEffect } from 'react';
+
+const ChatBar = ({ socket }) => {
+  const [users, setUsers] = useState([]);
+
+  useEffect(() => {
+    socket.on('newUserResponse', (data) => setUsers(data));
+  }, [socket, users]);
+
+  return (
+    <div className="chat__sidebar">
+      <h2>Open Chat</h2>
+      <div>
+        <h4 className="chat__header">ACTIVE USERS</h4>
+        <div className="chat__users">
+          {users.map((user) => (
+            <p key={user.socketID}>{user.userName}</p>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ChatBar;
+The useEffect hook listens to the response sent from the Node.js server and collects the list of active users. The list is mapped into the view and updated in real-time.
+
+Congratulations 💃🏻, we've been able to fetch the list of active users from Socket.io. Next, let's learn how to add some cool features to the chat application.
+
+Optional: Auto-scroll and Notify users when a user is typing
+In this section, you'll learn how to add the auto-scroll feature when you receive a new message and the typing feature that indicates that a user is typing.
+
+Auto-scroll feature
+GIFAuto Scroll
+
+Update the ChatPage.js file as below:
+import React, { useEffect, useState, useRef } from 'react';
+import ChatBar from './ChatBar';
+import ChatBody from './ChatBody';
+import ChatFooter from './ChatFooter';
+
+const ChatPage = ({ socket }) => {
+  const [messages, setMessages] = useState([]);
+  const [typingStatus, setTypingStatus] = useState('');
+  const lastMessageRef = useRef(null);
+
+  useEffect(() => {
+    socket.on('messageResponse', (data) => setMessages([...messages, data]));
+  }, [socket, messages]);
+
+  useEffect(() => {
+    // 👇️ scroll to bottom every time messages change
+    lastMessageRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  return (
+    <div className="chat">
+      <ChatBar socket={socket} />
+      <div className="chat__main">
+        <ChatBody messages={messages} lastMessageRef={lastMessageRef} />
+        <ChatFooter socket={socket} />
+      </div>
+    </div>
+  );
+};
+
+export default ChatPage;
+Update the ChatBody component to contain an element for lastMessageRef.
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+
+const ChatBody = ({ messages, lastMessageRef }) => {
+  const navigate = useNavigate();
+
+  const handleLeaveChat = () => {
+    localStorage.removeItem('userName');
+    navigate('/');
+    window.location.reload();
+  };
+
+  return (
+    <>
+      <div>
+        ......
+        {/* --- At the bottom of the JSX element ----*/}
+        <div ref={lastMessageRef} />
+      </div>
+    </>
+  );
+};
+
+export default ChatBody;
+From the code snippets above, lastMessageRef is attached to a div tag at the bottom of the messages, and its useEffect has a single dependency, which is the messages array. So, when the messages changes, the useEffect for the lastMessageRef re-renders.
+
+Notify others when a user is typing
+To notify users when a user is typing, we'll use the JavaScript onKeyDown event listener on the input field, which triggers a function that sends a message to Socket.io as below:
+import React, { useState } from 'react';
+
+const ChatFooter = ({ socket }) => {
+  const [message, setMessage] = useState('');
+
+  const handleTyping = () =>
+    socket.emit('typing', `${localStorage.getItem('userName')} is typing`);
+
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+    if (message.trim() && localStorage.getItem('userName')) {
+      socket.emit('message', {
+        text: message,
+        name: localStorage.getItem('userName'),
+        id: `${socket.id}${Math.random()}`,
+        socketID: socket.id,
+      });
+    }
+    setMessage('');
+  };
+  return (
+    <div className="chat__footer">
+      <form className="form" onSubmit={handleSendMessage}>
+        <input
+          type="text"
+          placeholder="Write message"
+          className="message"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+                    {/*OnKeyDown function*/}
+          onKeyDown={handleTyping}
+        />
+        <button className="sendBtn">SEND</button>
+      </form>
+    </div>
+  );
+};
+
+export default ChatFooter;
+From the code snippet above, the handleTyping function triggers the typing event whenever a user is typing into the text field. Then, we can listen to the typing event on the server and send a response containing the data to other users via another event called typingResponse.
+socketIO.on('connection', (socket) => {
+  // console.log(`⚡: ${socket.id} user just connected!`);
+  // socket.on('message', (data) => {
+  //   socketIO.emit('messageResponse', data);
+  // });
+
+  socket.on('typing', (data) => socket.broadcast.emit('typingResponse', data));
+
+  // socket.on('newUser', (data) => {
+  //   users.push(data);
+  //   socketIO.emit('newUserResponse', users);
+  // });
+
+  // socket.on('disconnect', () => {
+  //   console.log('🔥: A user disconnected');
+  //   users = users.filter((user) => user.socketID !== socket.id);
+  //   socketIO.emit('newUserResponse', users);
+  //   socket.disconnect();
+  // });
+});
+Next, listen to the typingResponse event in the ChatPage.js file and pass the data into the ChatBody.js file for display.
+import React, { useEffect, useState, useRef } from 'react';
+import ChatBar from './ChatBar';
+import ChatBody from './ChatBody';
+import ChatFooter from './ChatFooter';
+
+const ChatPage = ({ socket }) => {
+  // const [messages, setMessages] = useState([]);
+  // const [typingStatus, setTypingStatus] = useState('');
+  // const lastMessageRef = useRef(null);
+
+  // useEffect(() => {
+  //   socket.on('messageResponse', (data) => setMessages([...messages, data]));
+  // }, [socket, messages]);
+
+  // useEffect(() => {
+  //   // 👇️ scroll to bottom every time messages change
+  //   lastMessageRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // }, [messages]);
+
+  useEffect(() => {
+    socket.on('typingResponse', (data) => setTypingStatus(data));
+  }, [socket]);
+
+  return (
+    <div className="chat">
+      <ChatBar socket={socket} />
+      <div className="chat__main">
+        <ChatBody
+          messages={messages}
+          typingStatus={typingStatus}
+          lastMessageRef={lastMessageRef}
+        />
+        <ChatFooter socket={socket} />
+      </div>
+    </div>
+  );
+};
+
+export default ChatPage;
+Update the ChatBody.js file to show the typing status to the users.
+<div className="message__status">
+  <p>{typingStatus}</p>
+</div>
+Congratulations, you've just created a chat application!💃🏻
+
+Feel free to improve the application by adding the Socket.io private messaging feature that allows users to create private chat rooms and direct messaging, using an authentication library for user authorization and authentication and a real-time database for storage.
+
+Conclusion
+Socket.io is a great tool with excellent features that enables us to build efficient real-time applications like sports betting websites, auction and forex trading applications, and of course, chat applications by creating lasting connections between web browsers and a Node.js server.
+
+If you're looking forward to building a chat application in Node.js, Socket.io may be an excellent choice.
+
+You can find the source code for this tutorial here: https://github.com/novuhq/blog/tree/main/open-chat-app-with-socketIO
+
+Next article
+In the next part of the series I am going to talk about connecting the chat-app into browser notifications (web-push), so you can inform users about new messages if they are offline.
+
+Help me out!
+If you feel like this article helped you understand WebSockets better! I would be super happy if you could give us a star! And let me also know in the comments ❤️
+https://github.com/novuhq/novu
+GIFImage description
+
+Thank you for reading!
+
+Discussion (27)
+Subscribe
+pic
+Add to the discussion
+ 
+lexiebkm profile image
+Alexander B.K.
+•
+Aug 16
+
+I think I need to start writing a real-time app, so this article is interesting. Although I may have seen other real-time sample apps, this one still is still worth reading.
+
+
+2
+ likes
+Like
+Reply
+ 
+nevodavid profile image
+Nevo David 
+•
+Aug 16
+
+Thank you Alexander! In the next one I will continue this article on how to use Browser Notification on a new chat message, what do you think?
+
+
+1
+ like
+Like
+Reply
+ 
+lexiebkm profile image
+Alexander B.K.
+•
+Aug 16
+
+That is interesting too, but it would be better if you use standard Web API whenever possible, unless you think it will need specific library for that purpose.
+
+
+2
+ likes
+Like
+Thread
+nevodavid profile image
+Nevo David 
+•
+Aug 16
+
+What do you mean by "standard Web API whenever possible"? :)
+
+
+1
+ like
+Like
+Thread
+lexiebkm profile image
+Alexander B.K.
+•
+Aug 16
+
+Because you mentioned about browser notification, I searched in MDN if there was a tools for that purpose. So I mean like this one : developer.mozilla.org/en-US/docs/W...
+Of course, you are free to use other tools, library you have found suitable for that purpose.
+
+
+2
+ likes
+Like
+Thread
+nevodavid profile image
+Nevo David 
+•
+Aug 16
+
+It will probably be "web-push" library that wraps all those tools
+
+
+1
+ like
+Like
+Thread
+lexiebkm profile image
+Alexander B.K.
+•
+Aug 16
+
+Nice, I am waiting for that.
+Actually, I also want to see how you handle global state management if there are cases for that. Specifically, how you use Redux, because I am learning Redux with the recommended way mentioned in the Redux doc, i.e using Redux Toolkit (RTK) and RTK Query.
+But it is just fine if you don't use it in that app.
+
+
+2
+ likes
+Like
+Thread
+nevodavid profile image
+Nevo David 
+•
+Aug 16
+
+Anything specific you would like to build with Redux?
+
+
+1
+ like
+Like
+Thread
+lexiebkm profile image
+Alexander B.K.
+•
+Aug 16
+
+In my last project, I didn't use it, because I didn't learn it, it would take longer time before I could really use it. For global state management, I used a lib named reactN by Charles Stover which was easy to use.
+But now that I realize in what case Redux is suitable for, I think I am going to use it for my nearest project.
+
+
+1
+ like
+Like
+Reply
+ 
+topninja profile image
+Michael Jin
+•
+Aug 15
+
+Hi, novu team.
+This is so great.
+I also checked your packages on github, 7.3k stars - so amzing.
+Btw I want to know about nove.co platform's pricing.
+This is free platform? I signed on platform but there's no payment setup.
+
+
+3
+ likes
+Like
+Reply
+ 
+nevodavid profile image
+Nevo David 
+•
+Aug 15
+
+Hi Michael! We are currently on an open beta, we will introduce pricing very soon :)
+
+
+2
+ likes
+Like
+Reply
+ 
+renanfranca profile image
+Renan Franca
+•
+Aug 15 • Edited on Aug 15
+
+Could it be self hosted for free at heruko?
+
+
+3
+ likes
+Like
+Thread
+nevodavid profile image
+Nevo David 
+•
+Aug 16
+
+Not sure about Heruko, but I imagine you can.
+It uses Mongodb, Redis :)
+Try and let me know if it works for you!
+
+
+3
+ likes
+Like
+Reply
+ 
+nevodavid profile image
+Nevo David 
+•
+Aug 15
+
+What should I write about next?
+
+
+3
+ likes
+Like
+Reply
+ 
+joelbonetr profile image
+JoelBonetR
+•
+Aug 15
+
+You could fork the same project and just change the implementation details to "vanilla" websockets to see the differences with socket.io! 😁
+
+
+3
+ likes
+Like
+Reply
+ 
+nevodavid profile image
+Nevo David 
+•
+Aug 16
+
+It's good to understand vanilla websockets, but I don't think it's so practical 🤣
+You would now use it in production most chances 🙈
+
+
+2
+ likes
+Like
+Thread
+joelbonetr profile image
+JoelBonetR
+•
+Aug 16
+
+Hahaha it depends on the case, here I found a good TL; DR on that 😁
+
+
+1
+ like
+Like
+Thread
+nevodavid profile image
+Nevo David 
+•
+Aug 16
+
+Don't forget that in socket.io they also implemented long polling for old browsers :)
+
+
+2
+ likes
+Like
+Thread
+joelbonetr profile image
+JoelBonetR
+•
+Aug 16 • Edited on Aug 16
+
+The way socket.io actually works is by assuming those are AJAX requests and once some communications had been exchanged it switches the protocol, thus it's not a protocol downgrade but an upgrade (you can check that in the network tab of chrome dev tools), also check the link in the last comment for more details. Is it convenient?
+
+Well, web sockets has a good browser support so It depends on the use case of this "workaround" being more or less harmful.
+
+Also note that socket.io has 4 different versions and both client and server need to implement the same version as far as I can remember, hence as soon as v5 appears you'll need to provide both v4 and v5 versions to avoid current clients software breaking and to provide latest stable version for new customers or customers that want to migrate (thinking on the use-case of providing just a backend as service).
+
+
+1
+ like
+Like
+Reply
+ 
+sachinchaurasiya profile image
+Sachin Chaurasiya
+•
+Aug 15
+
+This is amazing, thanks for sharing @nevodavid
+
+
+2
+ likes
+Like
+Reply
+ 
+nevodavid profile image
+Nevo David 
+•
+Aug 16
+
+Thank you Sachin!
+Are you planning on building one? :)
+
+
+1
+ like
+Like
+Reply
+ 
+murtuzaalisurti profile image
+Murtuzaali Surti
+•
+Aug 15
+
+this is awesome! I might build one in the future, and might use novu as a notification system!! 👀
+
+
+2
+ likes
+Like
+Reply
+ 
+nevodavid profile image
+Nevo David 
+•
+Aug 15
+
+Haha that would be cool!
+Maybe we can collaborate on a project :)
+
+
+1
+ like
+Like
+Reply
+ 
+joelbonetr profile image
+JoelBonetR
+•
+Aug 15
+
+Nice one! Liked reading that post, recommending it right now 👌😁
+
+
+2
+ likes
+Like
+Reply
+ 
+nevodavid profile image
+Nevo David 
+•
+Aug 16
+
+Thank you very much Joel!
+
+
+2
+ likes
+Like
+Reply
+ 
+nevodavid profile image
+Nevo David 
+•
+Aug 15
+
+Did you build your native chat in your app, or used something like intercom?
+
+
+1
+ like
+Like
+Reply
+ 
+nevodavid profile image
+Nevo David 
+•
+Aug 15
+
+If you are building a chat app, make sure you post it here?
+
+
+1
+ like
+Like
+Reply
+Code of Conduct • Report abuse
+Read next
+balajidharma profile image
+How to Enable Laravel Email Verification and Customize Email Templates
+Balaji Dharma - Jul 30
+
+jeffreythecoder profile image
+5 Good practices to scale your React projects easily
+Jeffrey Yu - Aug 7
+
+raphaelartlist profile image
+Rings and Onion in Your Next Node Application
+Raphael Ben Hamo - Aug 7
+
+elbarryamine profile image
+How To Upload Files With GraphQl And NestJs
+ElbarryAmine - Jul 29
+
+
+novu
+Follow
+The open-source notifications infrastructure for developers
+Check out our growing community of engineers solving the Notification Infrastructure Space together.
+
+Join our GitHub
+More from novu
+We are trending on Github, This is how we did it 🤯
+#discuss #javascript #webdev #productivity
+How to raise funds for an open-source company 💵
+#discuss #webdev #opensource #javascript
+How to build a real-time Auction system - Connecting Socket.io With React 🔥 (Part 2)
+#react #node #javascript #programming
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap');
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Poppins', sans-serif;
+}
+.home__container {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+.home__container > * {
+  margin-bottom: 10px;
+}
+.home__header {
+  margin-bottom: 30px;
+}
+.username__input {
+  padding: 10px;
+  width: 50%;
+}
+.home__cta {
+  width: 200px;
+  padding: 10px;
+  font-size: 16px;
+  cursor: pointer;
+  background-color: #607eaa;
+  color: #f9f5eb;
+  outline: none;
+  border: none;
+  border-radius: 5px;
+}
+.chat {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+}
+.chat__sidebar {
+  height: 100%;
+  background-color: #f9f5eb;
+  flex: 0.2;
+  padding: 20px;
+  border-right: 1px solid #fdfdfd;
+}
+.chat__main {
+  height: 100%;
+  flex: 0.8;
+}
+.chat__header {
+  margin: 30px 0 20px 0;
+}
+.chat__users > * {
+  margin-bottom: 10px;
+  color: #607eaa;
+  font-size: 14px;
+}
+.online__users > * {
+  margin-bottom: 10px;
+  color: rgb(238, 102, 102);
+  font-style: italic;
+}
+.chat__mainHeader {
+  width: 100%;
+  height: 10vh;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  background-color: #f9f5eb;
+}
+.leaveChat__btn {
+  padding: 10px;
+  width: 150px;
+  border: none;
+  outline: none;
+  background-color: #d1512d;
+  cursor: pointer;
+  color: #eae3d2;
+}
+.message__container {
+  width: 100%;
+  height: 80vh;
+  background-color: #fff;
+  padding: 20px;
+  overflow-y: scroll;
+}
+
+.message__container > * {
+  margin-bottom: 10px;
+}
+.chat__footer {
+  padding: 10px;
+  background-color: #f9f5eb;
+  height: 10vh;
+}
+.form {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.message {
+  width: 80%;
+  height: 100%;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  outline: none;
+  padding: 15px;
+}
+.sendBtn {
+  width: 150px;
+  background-color: green;
+  padding: 10px;
+  border: none;
+  outline: none;
+  color: #eae3d2;
+  cursor: pointer;
+}
+.sendBtn:hover {
+  background-color: rgb(129, 201, 129);
+}
+.message__recipient {
+  background-color: #f5ccc2;
+  width: 300px;
+  padding: 10px;
+  border-radius: 10px;
+  font-size: 15px;
+}
+.message__sender {
+  background-color: rgb(194, 243, 194);
+  max-width: 300px;
+  padding: 10px;
+  border-radius: 10px;
+  margin-left: auto;
+  font-size: 15px;
+}
+.message__chats > p {
+  font-size: 13px;
+}
+.sender__name {
+  text-align: right;
+}
+.message__status {
+  position: fixed;
+  bottom: 50px;
+  font-size: 13px;
+  font-style: italic;
+}

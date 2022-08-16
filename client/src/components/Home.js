@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom"
 
 
 
-const Home = ()=>{
+const Home = ({ socket })=>{
     const navigate = useNavigate()
     const [username, setUsername] = useState('')
 
@@ -11,7 +11,7 @@ const Home = ()=>{
     const handleSubmit = (e)=>{
         e.preventDefault()
         localStorage.setItem('username', username)
-
+        socket.emit("newUser", {username, socketID: socket.id})
         navigate('/chat')
     }
 
@@ -20,7 +20,7 @@ const Home = ()=>{
             <h2>Signin to open chat</h2>
             <input type='text' name='username' value={username}
              onChange={(e)=> setUsername(e.target.value)} />
-            <button>Signin</button>
+            <button className="home_cta">Signin</button>
         </form>
     )
 
